@@ -1,0 +1,95 @@
+include:
+  - project: 'espressif/shared-ci-dangerjs' # Included external CI configuration from another GitLab repository
+    ref: master
+    file: 'danger.yaml'
+
+stages:
+  - danger
+  - pre-check
+  - test
+
+workflow: # Define when a CI pipeline should be created
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"' # Create pipeline for merge request events (push)
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"' # Do not create pipeline on push if there are open merge requests for the branch
+      when: never
+
+variables: # Variables available for all jobs in the pipeline
+  FF_TIMESTAMPS: true # Show timestamps in CI job logs
+  GIT_CLEAN_FLAGS: '-ffdx -e .cache/' # Ensure cache isn't deleted when the repository is cleaned
+  PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
+
+default: # Defaults for all jobs (unless overridden in a specific job)
+  cache:
+    paths: [.cache/pip]
+  image: python:3.9-bookworm # Minimum Python version is 3.9
+  tags:
+    - build
+    - internet
+
+# --- Code quality and linters
+run-danger-mr-linter:
+  stage: pre-check
+  image: node:18.15.0-alpine3.16
+
+pre-commit-mr:
+  stage: pre-check
+  needs: []
+  before_script:
+    - apt update && apt install -y -q git
+    - python3 -m pip install --upgrade pre-commit
+  script:
+    - echo "Merge request is from ${CI_COMMIT_REF_NAME} into ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+    - git fetch origin ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME} ${CI_COMMIT_REF_NAME}
+    - export from_sha=$(git merge-base HEAD origin/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME})
+    - echo "Checking changes from ${from_sha} to ${CI_COMMIT_SHA}:"
+    - git log --oneline ${from_sha}..${CI_COMMIT_SHA}
+    - echo "Modified files:"
+    - git diff-tree --no-commit-id --name-only -r ${from_sha} ${CI_COMMIT_SHA}
+    - echo "Running pre-commit:"
+    - pre-commit run --verbose --from ${from_sha} --to ${CI_COMMIT_SHA}
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" # Run on merge request events
+
+# --- Codebase tests - pytest
+
+build_apps:
+  image: espressif/idf:latest
+  needs: []
+  variables:
+    # Enable ccache for all build jobs. See configure_ci_environment.sh for more ccache related settings.
+    IDF_CCACHE_ENABLE: "1"
+  artifacts:
+    paths:
+      - "**/build*/*.bin"
+      - "**/build*/flasher_args.json"
+      - "**/build*/config/sdkconfig.json"
+      - "**/build*/bootloader/*.bin"
+      - "**/build*/partition_table/*.bin"
+      - "**/build*/build_log.txt"
+    when: always
+    expire_in: 4 days
+  script:
+    - cd $CI_PROJECT_DIR
+    - cd test_apps/jrnl_basic
+    - idf.py set-target esp32 build
+    - cd ../../test_apps/jrnl_vfs
+    - idf.py set-target esp32 build
+    - cd ../../test_apps/jrnl_adv
+    - idf.py set-target esp32 build
+    - cd ../../examples/basic
+    - idf.py set-target esp32 build
+
+target_test:
+  image: $CI_DOCKER_REGISTRY/target-test-env-v6.0:2
+  needs:
+    - build_apps
+  parallel:
+    matrix:
+      - target: ['esp32']
+        env_marker: ['generic']
+  tags: [$target, $env_marker]
+  script:
+    - pip install pytest-embedded-idf[serial]
+    - pytest --target ${target} -m ${env_marker}

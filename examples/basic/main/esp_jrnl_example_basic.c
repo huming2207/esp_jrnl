@@ -23,14 +23,24 @@ void app_main(void)
     esp_jrnl_config_t jrnl_config = ESP_JRNL_DEFAULT_CONFIG();
 
     esp_vfs_fat_mount_config_t mount_config = {
-            .format_if_mount_failed = true,
-            .max_files = 5
+        .format_if_mount_failed = true,
+        .max_files = 5
     };
 
     esp_err_t err = esp_vfs_fat_spiflash_mount_jrnl(basepath, partlabel, &mount_config, &jrnl_config, &jrnl_handle);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to mount journaled FatFS file system.");
+#if CONFIG_ESP_JRNL_FORCE_FORMAT
+        ESP_LOGW(TAG, "Failed to mount journaled FatFS file system, trying again with force_fs_format = true");
+        jrnl_config.force_fs_format = true;
+        err = esp_vfs_fat_spiflash_mount_jrnl(basepath, partlabel, &mount_config, &jrnl_config, &jrnl_handle);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to mount journaled FatFS file system");
+            return;
+        }
+#else
+        ESP_LOGE(TAG, "Failed to mount journaled FatFS file system");
         return;
+#endif
     }
     ESP_LOGI(TAG, "Journaled FatFS mounted successfully.");
 
