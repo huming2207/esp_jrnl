@@ -87,7 +87,7 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "Read from file: '%s'", line);
 
-    // All done, unmount partition and disable LittleFS
+    // All done, unmount partition and disable FATFS
     err = esp_vfs_fat_spiflash_unmount_jrnl(&jrnl_handle, basepath);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to unmount journaled FatFS file system.");
