@@ -22,7 +22,7 @@ extern "C" {
 * - finds the partition with defined partition_label. Partition label should be
 *   configured in the partition table.
 * - initializes flash wear levelling library on top of the given partition
-* - installs FS journal instance at the end of remaining partition space ("next" to thw WL sectors)
+* - installs FS journal instance at the end of remaining partition space ("next" to the WL sectors)
 * - mounts FAT partition using FATFS library on top of esp_fs_journal instance
 * - registers FATFS library with VFS, with prefix given by base_prefix variable, FatFS callbacks over-riden by esp_fs_journal
 *
@@ -52,7 +52,7 @@ esp_err_t esp_vfs_fat_spiflash_mount_jrnl(const char* base_path,
 /**
  * @brief Unmounts FAT filesystem from journaled partition and release resources acquired using esp_vfs_fat_spiflash_mount_jrnl
  *
- * @param[inout] jrnl_handle    esp_fs_journal instance handle returned by esp_vfs_fat_spiflash_mount_jrnl
+ * @param[in,out] jrnl_handle    esp_fs_journal instance handle returned by esp_vfs_fat_spiflash_mount_jrnl
  * @param[in] base_path         path where partition should be registered (e.g. "/spiflash")
  *
  * @return

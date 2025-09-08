@@ -45,7 +45,7 @@ esp_err_t ff_diskio_register_jrnl(const unsigned char pdrv, const esp_jrnl_handl
 BYTE ff_diskio_get_pdrv_jrnl(const esp_jrnl_handle_t jrnl_handle);
 
 /**
- * @brief Disconnects esp_fs_journal instance from FatFS drive (previsouly connected using ff_diskio_register_jrnl)
+ * @brief Disconnects esp_fs_journal instance from FatFS drive (previously connected using ff_diskio_register_jrnl)
  *
  * @param[in] jrnl_handle  FS journaling instance handle
  */
